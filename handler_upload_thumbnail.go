@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -56,7 +58,12 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	mediaType, _, err := mime.ParseMediaType(mediaTypeHeader)
 
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid content type;", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid content type.", err)
+		return
+	}
+
+	if mediaTypeHeader != "image/jpeg" && mediaTypeHeader != "image/png" {
+		respondWithError(w, http.StatusForbidden, "Only .png and .jpeg files allowed.", err)
 		return
 	}
 
@@ -84,7 +91,16 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	fileName := fmt.Sprintf("/%v%v", videoMetadata.ID, extensions[0])
+	number := make([]byte, 32)
+
+	_, err = rand.Read(number)
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		return
+	}
+
+	fileName := fmt.Sprintf("/%v%v", base64.RawURLEncoding.EncodeToString(number), extensions[0])
 	videoFilePath := filepath.Join(cfg.assetsRoot, fileName)
 
 	savedFile, err := os.Create(videoFilePath)
@@ -102,8 +118,6 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 
 	dataUrl := fmt.Sprintf("http://localhost:%v/%v", cfg.port, videoFilePath)
-
-	fmt.Println(dataUrl)
 
 	err = cfg.db.UpdateVideo(database.Video{
 		ID:                videoMetadata.ID,

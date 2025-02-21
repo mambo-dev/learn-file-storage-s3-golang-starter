@@ -8,7 +8,13 @@ import (
 )
 
 func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
-	splitURL := strings.Split(*video.VideoURL, ",")
+	videoURL := *video.VideoURL
+	splitURL := strings.Split(videoURL, ",")
+
+	if len(splitURL) != 2 {
+		return video, nil
+	}
+
 	bucket := splitURL[0]
 	key := splitURL[1]
 

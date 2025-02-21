@@ -94,6 +94,22 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	processedVideo, err := processVideoForFastStart(file.Name())
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		return
+	}
+
+	processedFile, err := os.Open(processedVideo)
+	defer os.Remove(processedFile.Name())
+	defer processedFile.Close()
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		return
+	}
+
 	extensions, err := mime.ExtensionsByType(mediaType)
 
 	if err != nil {
@@ -113,12 +129,10 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 
 	s3Key := fmt.Sprintf("%v/%v%v", display, hex.EncodeToString(random32), extensions[3])
 
-	fmt.Println(s3Key)
-
 	_, err = cfg.s3Client.PutObject(r.Context(), &s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
 		Key:         &s3Key,
-		Body:        file,
+		Body:        processedFile,
 		ContentType: &mediaType,
 	})
 
